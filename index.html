@@ -666,7 +666,7 @@ const Music = (function(){
     /* Pantalla de misión completada: música final */
     if(state.started && state.view === TOTAL && finOk){
       track.pause(); synthStop();
-      if(fin.paused){ fin.currentTime = 0; fin.play().catch(()=>{ if(fin.error){ finOk=false; synthStart(); } }); }
+      if(fin.paused){ fin.currentTime = 0; fin.play().catch(()=>{ if(fin.error){ finOk=false; synthStart(); } else showGate(); }); }
       return;
     }
     fin.pause();
@@ -675,9 +675,16 @@ const Music = (function(){
     const p = track.play();
     if(p && p.then) p.then(hideGate).catch(()=>{ if(track.error){ useTrack=false; synthStart(); hideGate(); } else showGate(); });
   };
+  /* Se llama dentro del propio toque al descifrar el último código: así el móvil permite que suene. */
+  Music.playFinal = function(){
+    if(!Music.enabled || !finOk) return;
+    track.pause(); synthStop();
+    try{ fin.currentTime = 0; }catch(e){}
+    const p = fin.play(); if(p && p.catch) p.catch(()=>{});
+  };
   Music.stop = function(){ track.pause(); fin.pause(); synthStop(); };
   /* Si el navegador bloquea el sonido al abrir, una pantalla de entrada pide un toque y la música suena al instante. */
-  function showGate(){ if(!state.started && Music.enabled) $('#gate').classList.remove('hidden'); }
+  function showGate(){ if((!state.started || state.view===TOTAL) && Music.enabled) $('#gate').classList.remove('hidden'); }
   function hideGate(){ $('#gate').classList.add('hidden'); }
   $('#gate').addEventListener('click', ()=>{ hideGate(); Music.start(); });
   Music.toggle = function(){
@@ -803,6 +810,7 @@ $('#codeForm').addEventListener('submit', function(e){
 
 function success(){
   busy = true; Music.chime(true);
+  if(state.unlocked + 1 === TOTAL) Music.playFinal();
   $('#codeInput').disabled = true; $('#codeBtn').disabled = true;
   const msg = $('#codeMsg'); msg.textContent='Acceso concedido. Descifrando transmisión…'; msg.className='codemsg ok';
   $('#decode').classList.remove('hidden');
