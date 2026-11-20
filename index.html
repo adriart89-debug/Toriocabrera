@@ -243,6 +243,7 @@ h1 .main{display:block;font-size:clamp(30px,9.2vw,52px);letter-spacing:.07em;
 </head>
 <body>
 <audio id="bgm" src="audio/musica.mp3" preload="auto" loop playsinline></audio>
+<audio id="bgmFinal" src="audio/final.mp3" preload="auto" loop playsinline></audio>
 <canvas id="stars" aria-hidden="true"></canvas>
 <div class="nebula" aria-hidden="true"></div>
 <div class="planet p1" aria-hidden="true"></div>
@@ -654,27 +655,39 @@ const Music = (function(){
 (function(){
   const track = document.getElementById('bgm');
   track.volume = 0.45; try{ track.load(); }catch(e){}
+  const fin = document.getElementById('bgmFinal'); fin.volume = 0.55;
+  let finOk = true; fin.addEventListener('error', ()=>{ finOk = false; });
   let useTrack = true;
   const synthStart = Music.start, synthStop = Music.stop, synthToggle = Music.toggle;
   track.addEventListener('error', ()=>{ useTrack = false; });
   /* Pantalla de inicio: suena tu pista. Al iniciar la misión: música sintetizada que cambia con cada transmisión. */
   Music.start = function(){
     if(!Music.enabled) return;
+    /* Pantalla de misión completada: música final */
+    if(state.started && state.view === TOTAL && finOk){
+      track.pause(); synthStop();
+      if(fin.paused){ fin.currentTime = 0; fin.play().catch(()=>{ if(fin.error){ finOk=false; synthStart(); } }); }
+      return;
+    }
+    fin.pause();
     if(!useTrack || state.started){ track.pause(); synthStart(); return; }
     synthStop();
     const p = track.play();
     if(p && p.then) p.then(hideGate).catch(()=>{ if(track.error){ useTrack=false; synthStart(); hideGate(); } else showGate(); });
   };
-  Music.stop = function(){ track.pause(); synthStop(); };
+  Music.stop = function(){ track.pause(); fin.pause(); synthStop(); };
   /* Si el navegador bloquea el sonido al abrir, una pantalla de entrada pide un toque y la música suena al instante. */
   function showGate(){ if(!state.started && Music.enabled) $('#gate').classList.remove('hidden'); }
   function hideGate(){ $('#gate').classList.add('hidden'); }
   $('#gate').addEventListener('click', ()=>{ hideGate(); Music.start(); });
   Music.toggle = function(){
     const on = synthToggle();
-    if(on) Music.start(); else { track.pause(); synthStop(); }
+    if(on) Music.start(); else { track.pause(); fin.pause(); synthStop(); }
     return on;
   };
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden) fin.pause(); else if(Music.enabled && state.started && state.view===TOTAL && finOk) fin.play().catch(()=>{});
+  });
   document.addEventListener('visibilitychange', ()=>{
     if(!useTrack || state.started) return;
     if(document.hidden) track.pause(); else if(Music.enabled && !track.ended && track.currentTime>0) track.play().catch(()=>{});
@@ -713,6 +726,7 @@ function renderStage(){
   $('#finaleHead').classList.toggle('hidden', !s.final);
   $('#progText').textContent = 'Transmisión ' + i + ' de ' + TOTAL;
   Music.setMood(s.theme);
+  if(state.started) Music.start();
 
   const im = IMAGENES[i-1], hero = $('#hero'), himg = $('#heroImg');
   if(im){
